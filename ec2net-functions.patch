@@ -1,0 +1,152 @@
+--- ec2net-functions	2020-08-06 23:28:48.759667700 +0800
++++ /tmp/ec2net-functions	2020-08-06 23:32:36.781787400 +0800
+@@ -47,7 +47,7 @@
+   # make no changes to unmanaged interfaces
+   unmanaged=$(LANG=C grep -l "^[[:space:]]*EC2SYNC=no\([[:space:]#]\|$\)" $config_file)
+   if [ "${config_file}" == "${unmanaged}" ]; then
+-    logger --tag ec2net "Not managing ${INTERFACE}"
++    logger -t ec2net "Not managing ${INTERFACE}"
+     exit
+   fi
+   # check to see if we should add a default route through ${INTERFACE} to the main kernel route table
+@@ -58,11 +58,11 @@
+ fi
+ 
+ get_meta() {
+-  logger --tag ec2net "[get_meta] Getting token for IMDSv2"
++  logger -t ec2net "[get_meta] Getting token for IMDSv2"
+   imds_token=$(curl -s -f -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 60" ${METADATA_BASEURL}/${METADATA_TOKEN_PATH})
+   if [ "${?}" -gt 0 ]; then
+-    logger --tag ec2net "[get_meta] Failed to get IMDSv2 token from ${METADATA_BASEURL}/${METADATA_TOKEN_PATH}"
+-    logger --tag ec2net "[get_meta] Is Instance Metadata disabled? Aborting"
++    logger -t ec2net "[get_meta] Failed to get IMDSv2 token from ${METADATA_BASEURL}/${METADATA_TOKEN_PATH}"
++    logger -t ec2net "[get_meta] Is Instance Metadata disabled? Aborting"
+     return
+   fi
+   # IMDS can take up to 30s to provide the information of a new ENI
+@@ -70,10 +70,10 @@
+   false
+   while [ "${?}" -gt 0 ]; do
+     if [ "${attempts}" -eq 0 ]; then
+-      logger --tag ec2net "[get_meta] Failed to get ${METADATA_BASEURL}/${METADATA_MAC_PATH}/${HWADDR}/${1}"
++      logger -t ec2net "[get_meta] Failed to get ${METADATA_BASEURL}/${METADATA_MAC_PATH}/${HWADDR}/${1}"
+       return
+     fi
+-    logger --tag ec2net "[get_meta] Trying to get ${METADATA_BASEURL}/${METADATA_MAC_PATH}/${HWADDR}/${1}"
++    logger -t ec2net "[get_meta] Trying to get ${METADATA_BASEURL}/${METADATA_MAC_PATH}/${HWADDR}/${1}"
+     meta=$(curl -s -H "X-aws-ec2-metadata-token:${imds_token}" -f ${METADATA_BASEURL}/${METADATA_MAC_PATH}/${HWADDR}/${1})
+     if [ "${?}" -gt 0 ]; then
+       let attempts--
+@@ -120,7 +120,7 @@
+   # up to 10 seconds for an RA route to be added by the kernel.
+ 
+   if echo "$new_dhcp6_server_id" | grep -q "^0:3:0:1:"; then
+-    logger --tag ec2net "[get_ipv6_gateway] Using DHCP6 environment variable"
++    logger -t ec2net "[get_ipv6_gateway] Using DHCP6 environment variable"
+     octets=($(echo "$new_dhcp6_server_id" | rev | cut -d : -f -6 | rev | tr : ' '))
+ 
+     # The gateway's link local address is derived from the
+@@ -140,11 +140,11 @@
+     quibbles[3]=$(( (0x${octets[4]} << 8) + 0x${octets[5]} ))
+     printf "fe80::%04x:%04x:%04x:%04x\n" ${quibbles[@]}
+   else
+-    logger --tag ec2net "[get_ipv6_gateway] Waiting for IPv6 router advertisement"
++    logger -t ec2net "[get_ipv6_gateway] Waiting for IPv6 router advertisement"
+     attempts=20
+     while true; do
+       if [ "${attempts}" -eq 0 ]; then
+-        logger --tag ec2net "[get_ipv6_gateway] Failed to receive router advertisement"
++        logger -t ec2net "[get_ipv6_gateway] Failed to receive router advertisement"
+         return
+       fi
+       gateway6=$(/sbin/ip -6 route show dev "${INTERFACE}" | grep ^default | awk '{print $3}')
+@@ -163,7 +163,7 @@
+   if [ "${INTERFACE}" == "eth0" ]; then
+     return
+   fi
+-  logger --tag ec2net "[remove_primary] Removing configs for ${INTERFACE}"
++  logger -t ec2net "[remove_primary] Removing configs for ${INTERFACE}"
+   rm -f ${config_file}
+   rm -f ${route_file}
+   rm -f ${route6_file}
+@@ -174,7 +174,7 @@
+   if [ "${INTERFACE}" == "eth0" ]; then
+     return
+   fi
+-  logger --tag ec2net "[rewrite_primary] Rewriting configs for ${INTERFACE}"
++  logger -t ec2net "[rewrite_primary] Rewriting configs for ${INTERFACE}"
+   cidr=$(get_cidr)
+   if [ -z ${cidr} ]; then
+     return
+@@ -204,7 +204,7 @@
+ 	${cidr} dev ${INTERFACE} proto kernel scope link src ${primary_ipv4} table ${RTABLE}
+ EOF
+   if [ "${MAINROUTETABLE}" == "yes" ]; then
+-	logger --tag ec2net "[rewrite_primary] adding default route to main table for ${INTERFACE}"
++	logger -t ec2net "[rewrite_primary] adding default route to main table for ${INTERFACE}"
+ 	cat <<- EOF >> ${route_file}
+ 	default via ${gateway} dev ${INTERFACE} metric ${RTABLE}
+ EOF
+@@ -228,7 +228,7 @@
+ }
+ 
+ remove_aliases() {
+-  logger --tag ec2net "[remove_aliases] Removing aliases of ${INTERFACE}"
++  logger -t ec2net "[remove_aliases] Removing aliases of ${INTERFACE}"
+   /sbin/ip -4 addr flush dev ${INTERFACE} secondary
+ }
+ 
+@@ -238,7 +238,7 @@
+     remove_aliases
+     return
+   fi
+-  logger --tag ec2net "[rewrite_aliases] Rewriting aliases of ${INTERFACE}"
++  logger -t ec2net "[rewrite_aliases] Rewriting aliases of ${INTERFACE}"
+   # The network prefix can be provided in the environment by
+   # e.g. DHCP, but if it's not available then we need it to
+   # correctly configure secondary addresses.
+@@ -274,7 +274,7 @@
+   if [ "${INTERFACE}" == "eth0" ]; then
+     return
+   fi
+-  logger --tag ec2net "[remove_rules] Removing rules for ${INTERFACE}"
++  logger -t ec2net "[remove_rules] Removing rules for ${INTERFACE}"
+   for rule in $(/sbin/ip -4 rule list \
+                 |grep "from .* lookup ${RTABLE}" \
+                 |awk -F: '{print $1}'); do
+@@ -308,7 +308,7 @@
+ 	default via ${gateway6} dev ${INTERFACE} table ${RTABLE}
+ EOF
+   fi
+-  logger --tag ec2net "[rewrite_rules] Rewriting rules for ${INTERFACE}"
++  logger -t ec2net "[rewrite_rules] Rewriting rules for ${INTERFACE}"
+   # Retrieve a list of IP rules for the route table that belongs
+   # to this interface. Treat this as the stale list. For each IP
+   # address obtained from metadata, cross the corresponding rule
+@@ -353,22 +353,22 @@
+ }
+ 
+ plug_interface() {
+-  logger --tag ec2net "[plug_interface] ${INTERFACE} plugged"
++  logger -t ec2net "[plug_interface] ${INTERFACE} plugged"
+   rewrite_primary
+ }
+ 
+ unplug_interface() {
+-  logger --tag ec2net "[unplug_interface] ${INTERFACE} unplugged"
++  logger -t ec2net "[unplug_interface] ${INTERFACE} unplugged"
+   remove_rules
+   remove_aliases
+ }
+ 
+ activate_primary() {
+-  logger --tag ec2net "[activate_primary] Activating ${INTERFACE}"
++  logger -t ec2net "[activate_primary] Activating ${INTERFACE}"
+   /sbin/ifup ${INTERFACE}
+ }
+ 
+ deactivate_primary() {
+-  logger --tag ec2net "[deactivate_primary] Deactivating ${INTERFACE}"
++  logger -t ec2net "[deactivate_primary] Deactivating ${INTERFACE}"
+   /sbin/ifdown ${INTERFACE}
+ }

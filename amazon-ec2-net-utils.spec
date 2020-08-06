@@ -27,6 +27,7 @@ Source13:  ec2net-scan.service
 Source14:  write_net_rules
 Source15:  rule_generator.functions
 Source16:  ec2net-ifup@.service
+Patch0:    ec2net-functions.patch
 
 URL:       https://github.com/aws/amazon-ec2-net-utils
 BuildArch: noarch
@@ -46,6 +47,8 @@ amazon-ec2-net-utils contains a set of utilities for managing elastic network
 interfaces.
 
 %prep
+
+%patch0 -p0
 
 %build
 
@@ -127,6 +130,9 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man8/ec2ifscan.8.gz
 
 %changelog
+* Thur Aug 6 2020 Alexey Zilber <azilber@consultentltd> 1.4-3
+- Provides CentOs 6 compatability
+
 * Mon Jul 13 2020 Frederick Lefebvre <fredlef@amazon.com> 1.4-2
 - Provides ec2-net-utils for backward compatibility
 
